@@ -22,7 +22,9 @@ class SpiderEnv(gym.Env):
         self.render_mode = render_mode
         self.max_lidar_distance = 5.0
         self.num_rays = 360
+        self.max_steps = 500
         self.position = [0, 0, 0]
+        self.step_count = 0
 
         # Action smoothing memory
         self.prev_action = np.zeros(12, dtype=np.float32)
@@ -241,7 +243,8 @@ class SpiderEnv(gym.Env):
 
         self.robot_id = self._create_robot()
         self.prev_action = np.zeros(12, dtype=np.float32)
-        
+        self.step_count = 0
+
         self.obstacles = []
         self.obstacles.append(self._create_wall([2.5, 3, 0.5], length=7))
         self.obstacles.append(self._create_wall90([-1, 0, 0.5], length=6))
@@ -266,12 +269,14 @@ class SpiderEnv(gym.Env):
         padding = np.zeros(4, dtype=np.float32)
         return np.concatenate([lidar, sector_mins, yaw, velocity, padding])
     def step(self, action):
-
         self._ensure_client()
         if self.robot_id is None or p.getNumBodies(physicsClientId=self.client) == 0:
             self.reset()
 
+        self.step_count += 1
         terminated = False
+
+        action = np.clip(action, -1.0, 1.0)
 
         # --- Smooth actions
         alpha = 0.2
@@ -350,8 +355,9 @@ class SpiderEnv(gym.Env):
             reward -= 0.01
 
         self.position = new_position
+        truncated = (not terminated) and (self.step_count >= self.max_steps)
 
-        return self._get_observation(), reward, terminated, False, {}
+        return self._get_observation(), reward, terminated, truncated, {}
     def render(self):
         pass
 

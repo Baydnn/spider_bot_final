@@ -6,3 +6,5 @@ clip_epsilon: 0.2
 entropy_coef: 0.01       
 n_epochs: 10             
 batch_size: 64
+max_grad_norm: 0.5
+n_rollout_steps: 2048
