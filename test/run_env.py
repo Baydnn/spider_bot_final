@@ -4,7 +4,6 @@ import yaml
 
 from ppo import PPOAgent
 from spider_env import SpiderEnv
-from rollout_buffer import RolloutBuffer
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 SRC_PATH = os.path.join(DIR_PATH, "..", "src")
@@ -46,11 +45,12 @@ for global_step in range(TOTAL_TIMESTEPS):
     obs, reward, terminated, truncated, _ = env.step(env_action)
     episode_reward += reward
     done = terminated or truncated
-    agent.memory.store(state, action, value, reward, log_prob, done)
+
+    agent.memory.store(state, raw_action, value, reward, log_prob, done)
+    rollout_steps += 1
 
     if done:
         episode += 1
-
         reward_history.append(episode_reward)
         recent = reward_history[-100:]
         mean_reward = np.mean(recent)
@@ -64,15 +64,16 @@ for global_step in range(TOTAL_TIMESTEPS):
         obs, info = env.reset()
         episode_reward = 0.0
 
-        log_episode_reward(episode, mean_reward)
+    if rollout_steps >= N_ROLLOUT_STEPS:
         if train:
-            agent.ppo_update()
+            agent.ppo_update(last_obs=obs)
+            num_updates += 1
 
-        if episode % 10 == 0 and train:
-            print(f"EPISODE: {episode}")
-            agent.save_checkpoint()
+            if num_updates % 5 == 0:
+                print(f"Update {num_updates} | Episode {episode} | "
+                      f"Mean reward (last 100): {np.mean(reward_history[-100:]):.2f}")
+                agent.save_checkpoint()
 
-        obs, info = env.reset()
-        episode_reward = 0
+        rollout_steps = 0
 
 env.close()
